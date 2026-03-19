@@ -1,3 +1,78 @@
+class MinHeap {
+  constructor(compare) {
+    this.heap = [];
+    this.compare = compare;
+  }
+
+  isEmpty() {
+    return this.heap.length === 0;
+  }
+
+  push(value) {
+    this.heap.push(value);
+    this.bubbleUp(this.heap.length - 1);
+  }
+
+  pop() {
+    if (this.heap.length === 0) return null;
+    const min = this.heap[0];
+    const tail = this.heap.pop();
+
+    if (this.heap.length > 0) {
+      this.heap[0] = tail;
+      this.bubbleDown(0);
+    }
+
+    return min;
+  }
+
+  bubbleUp(index) {
+    let current = index;
+    while (current > 0) {
+      const parent = Math.floor((current - 1) / 2);
+      if (this.compare(this.heap[current], this.heap[parent]) >= 0) break;
+
+      [this.heap[current], this.heap[parent]] = [
+        this.heap[parent],
+        this.heap[current],
+      ];
+      current = parent;
+    }
+  }
+
+  bubbleDown(index) {
+    let current = index;
+
+    while (true) {
+      const left = current * 2 + 1;
+      const right = current * 2 + 2;
+      let smallest = current;
+
+      if (
+        left < this.heap.length &&
+        this.compare(this.heap[left], this.heap[smallest]) < 0
+      ) {
+        smallest = left;
+      }
+
+      if (
+        right < this.heap.length &&
+        this.compare(this.heap[right], this.heap[smallest]) < 0
+      ) {
+        smallest = right;
+      }
+
+      if (smallest === current) break;
+
+      [this.heap[current], this.heap[smallest]] = [
+        this.heap[smallest],
+        this.heap[current],
+      ];
+      current = smallest;
+    }
+  }
+}
+
 function getNeighbors(node, grid) {
   const neighbors = [];
   const { row, col } = node;
@@ -27,25 +102,31 @@ function getShortestPath(targetNode, startNode) {
 
 export function dijkstra(grid, startNode, targetNode) {
   const visitedNodesInOrder = [];
-  const unvisitedNodes = [];
+  const minHeap = new MinHeap((a, b) => a.priority - b.priority);
 
   for (const row of grid) {
     for (const node of row) {
       node.isVisited = false;
       node.distance = Infinity;
       node.previousNode = null;
-      unvisitedNodes.push(node);
     }
   }
 
   startNode.distance = 0;
+  minHeap.push({ node: startNode, priority: startNode.distance });
 
-  while (unvisitedNodes.length > 0) {
-    unvisitedNodes.sort((a, b) => a.distance - b.distance);
-    const closestNode = unvisitedNodes.shift();
+  while (!minHeap.isEmpty()) {
+    const entry = minHeap.pop();
+    if (!entry) break;
+
+    const { node: closestNode, priority } = entry;
+
+    // Ignore stale heap entries created before a better distance was found.
+    if (priority !== closestNode.distance) continue;
 
     if (!closestNode || closestNode.isWall) continue;
     if (closestNode.distance === Infinity) break;
+    if (closestNode.isVisited) continue;
 
     closestNode.isVisited = true;
     visitedNodesInOrder.push(closestNode);
@@ -60,6 +141,7 @@ export function dijkstra(grid, startNode, targetNode) {
       if (tentativeDistance < neighbor.distance) {
         neighbor.distance = tentativeDistance;
         neighbor.previousNode = closestNode;
+        minHeap.push({ node: neighbor, priority: neighbor.distance });
       }
     }
   }

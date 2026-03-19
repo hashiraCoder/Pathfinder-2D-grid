@@ -1,3 +1,78 @@
+class MinHeap {
+  constructor(compare) {
+    this.heap = [];
+    this.compare = compare;
+  }
+
+  isEmpty() {
+    return this.heap.length === 0;
+  }
+
+  push(value) {
+    this.heap.push(value);
+    this.bubbleUp(this.heap.length - 1);
+  }
+
+  pop() {
+    if (this.heap.length === 0) return null;
+    const min = this.heap[0];
+    const tail = this.heap.pop();
+
+    if (this.heap.length > 0) {
+      this.heap[0] = tail;
+      this.bubbleDown(0);
+    }
+
+    return min;
+  }
+
+  bubbleUp(index) {
+    let current = index;
+    while (current > 0) {
+      const parent = Math.floor((current - 1) / 2);
+      if (this.compare(this.heap[current], this.heap[parent]) >= 0) break;
+
+      [this.heap[current], this.heap[parent]] = [
+        this.heap[parent],
+        this.heap[current],
+      ];
+      current = parent;
+    }
+  }
+
+  bubbleDown(index) {
+    let current = index;
+
+    while (true) {
+      const left = current * 2 + 1;
+      const right = current * 2 + 2;
+      let smallest = current;
+
+      if (
+        left < this.heap.length &&
+        this.compare(this.heap[left], this.heap[smallest]) < 0
+      ) {
+        smallest = left;
+      }
+
+      if (
+        right < this.heap.length &&
+        this.compare(this.heap[right], this.heap[smallest]) < 0
+      ) {
+        smallest = right;
+      }
+
+      if (smallest === current) break;
+
+      [this.heap[current], this.heap[smallest]] = [
+        this.heap[smallest],
+        this.heap[current],
+      ];
+      current = smallest;
+    }
+  }
+}
+
 function manhattanDistance(currentNode, targetNode) {
   return (
     Math.abs(currentNode.row - targetNode.row) +
@@ -34,7 +109,10 @@ function getShortestPath(targetNode, startNode) {
 
 export function aStar(grid, startNode, targetNode) {
   const visitedNodesInOrder = [];
-  const openSet = [];
+  const minHeap = new MinHeap((a, b) => {
+    if (a.priority === b.priority) return a.secondary - b.secondary;
+    return a.priority - b.priority;
+  });
 
   for (const row of grid) {
     for (const node of row) {
@@ -47,15 +125,22 @@ export function aStar(grid, startNode, targetNode) {
 
   startNode.distance = 0;
   startNode.fScore = manhattanDistance(startNode, targetNode);
-  openSet.push(startNode);
+  minHeap.push({
+    node: startNode,
+    priority: startNode.fScore,
+    secondary: startNode.distance,
+  });
 
-  while (openSet.length > 0) {
-    openSet.sort((a, b) => {
-      if (a.fScore === b.fScore) return a.distance - b.distance;
-      return a.fScore - b.fScore;
-    });
+  while (!minHeap.isEmpty()) {
+    const entry = minHeap.pop();
+    if (!entry) break;
 
-    const currentNode = openSet.shift();
+    const { node: currentNode, priority, secondary } = entry;
+    // Ignore stale heap entries created before better scores were discovered.
+    if (priority !== currentNode.fScore || secondary !== currentNode.distance) {
+      continue;
+    }
+
     if (!currentNode || currentNode.isWall || currentNode.isVisited) continue;
 
     currentNode.isVisited = true;
@@ -72,10 +157,11 @@ export function aStar(grid, startNode, targetNode) {
         neighbor.previousNode = currentNode;
         neighbor.distance = tentativeDistance;
         neighbor.fScore = tentativeDistance + manhattanDistance(neighbor, targetNode);
-
-        if (!openSet.includes(neighbor)) {
-          openSet.push(neighbor);
-        }
+        minHeap.push({
+          node: neighbor,
+          priority: neighbor.fScore,
+          secondary: neighbor.distance,
+        });
       }
     }
   }
